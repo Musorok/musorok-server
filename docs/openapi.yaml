@@ -1,0 +1,53 @@
+openapi: 3.0.3
+info:
+  title: MusorOK API
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+paths:
+  /v1/health:
+    get:
+      summary: Health
+      responses: { '200': { description: ok } }
+  /v1/auth/register:
+    post:
+      summary: Register
+      responses: { '201': { description: created } }
+  /v1/auth/login:
+    post:
+      summary: Login
+      responses: { '200': { description: ok } }
+  /v1/me:
+    get:
+      summary: Me (+flags)
+      security: [{ BearerAuth: [] }]
+      responses: { '200': { description: ok } }
+  /v1/addresses:
+    get:
+      summary: List addresses
+      security: [{ BearerAuth: [] }]
+      responses: { '200': { description: ok } }
+    post:
+      summary: Create address
+      security: [{ BearerAuth: [] }]
+      responses: { '201': { description: created } }
+  /v1/orders/quote:
+    post:
+      summary: Quote one-time order
+      security: [{ BearerAuth: [] }]
+      responses: { '200': { description: ok } }
+  /v1/orders:
+    post:
+      summary: Create one-time order
+      security: [{ BearerAuth: [] }]
+      responses: { '201': { description: created } }
+  /v1/payments/webhook:
+    post:
+      summary: Payment webhook
+      responses: { '200': { description: ok } }
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
