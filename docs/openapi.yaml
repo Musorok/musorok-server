@@ -2,52 +2,1063 @@ openapi: 3.0.3
 info:
   title: MusorOK API
   version: 1.0.0
+  description: |
+    This API powers the MusorOK mobile and courier applications. It exposes
+    endpoints for user authentication, address management, quoting and creating
+    one‑time and subscription orders, payment processing, promocode validation,
+    courier workflows and administrative functions. The specification below
+    defines request and response bodies using reusable schemas and documents
+    common error responses.
 servers:
   - url: http://localhost:8080
-paths:
-  /v1/health:
-    get:
-      summary: Health
-      responses: { '200': { description: ok } }
-  /v1/auth/register:
-    post:
-      summary: Register
-      responses: { '201': { description: created } }
-  /v1/auth/login:
-    post:
-      summary: Login
-      responses: { '200': { description: ok } }
-  /v1/me:
-    get:
-      summary: Me (+flags)
-      security: [{ BearerAuth: [] }]
-      responses: { '200': { description: ok } }
-  /v1/addresses:
-    get:
-      summary: List addresses
-      security: [{ BearerAuth: [] }]
-      responses: { '200': { description: ok } }
-    post:
-      summary: Create address
-      security: [{ BearerAuth: [] }]
-      responses: { '201': { description: created } }
-  /v1/orders/quote:
-    post:
-      summary: Quote one-time order
-      security: [{ BearerAuth: [] }]
-      responses: { '200': { description: ok } }
-  /v1/orders:
-    post:
-      summary: Create one-time order
-      security: [{ BearerAuth: [] }]
-      responses: { '201': { description: created } }
-  /v1/payments/webhook:
-    post:
-      summary: Payment webhook
-      responses: { '200': { description: ok } }
+
 components:
   securitySchemes:
     BearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: Numeric error code
+        message:
+          type: string
+          description: Human‑readable error message
+      required: [code, message]
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        phone:
+          type: string
+        email:
+          type: string
+          nullable: true
+        name:
+          type: string
+        role:
+          type: string
+          enum: [USER, COURIER, ADMIN]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required: [id, phone, name, role, created_at, updated_at]
+    Address:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        lat:
+          type: number
+          format: double
+        lng:
+          type: number
+          format: double
+        city:
+          type: string
+        street:
+          type: string
+        house:
+          type: string
+        entrance:
+          type: string
+          nullable: true
+        floor:
+          type: string
+          nullable: true
+        apartment:
+          type: string
+          nullable: true
+        intercom:
+          type: string
+          nullable: true
+        is_default:
+          type: boolean
+        polygon_id:
+          type: string
+          format: uuid
+          nullable: true
+        polygon_name:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+      required: [id, user_id, lat, lng, city, street, house, is_default, created_at]
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        address_id:
+          type: string
+          format: uuid
+        polygon_id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [ONE_TIME, SUBSCRIPTION]
+        bags_count:
+          type: integer
+        price_kzt:
+          type: integer
+        comment:
+          type: string
+          nullable: true
+        time_option:
+          type: string
+          enum: [ASAP, SCHEDULED]
+        scheduled_at:
+          type: string
+          format: date-time
+          nullable: true
+        courier_id:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+          enum: [NEW, PAID, ASSIGNED, PICKING_UP, DONE, CANCELED, REFUNDED]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required: [id, user_id, address_id, polygon_id, type, bags_count, price_kzt, time_option, status, created_at, updated_at]
+    Subscription:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        plan:
+          type: string
+          enum: [P7, P15, P30]
+        total_bags:
+          type: integer
+        remaining_bags:
+          type: integer
+        price_kzt:
+          type: integer
+        status:
+          type: string
+          enum: [ACTIVE, PAUSED, CANCELED, EXPIRED]
+        started_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_payment_id:
+          type: string
+          format: uuid
+          nullable: true
+      required: [id, user_id, plan, total_bags, remaining_bags, price_kzt, status, started_at]
+    Payment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        order_id:
+          type: string
+          format: uuid
+          nullable: true
+        subscription_id:
+          type: string
+          format: uuid
+          nullable: true
+        amount_kzt:
+          type: integer
+        provider:
+          type: string
+          enum: [PAYNETWORKS]
+        status:
+          type: string
+          enum: [INIT, REQUIRES_ACTION, SUCCEEDED, FAILED, CANCELED]
+        provider_intent_id:
+          type: string
+        provider_payload:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required: [id, user_id, amount_kzt, provider, status, provider_intent_id, created_at, updated_at]
+    SubscriptionPlan:
+      type: object
+      properties:
+        plan:
+          type: string
+          enum: [P7, P15, P30]
+        price:
+          type: integer
+        total_bags:
+          type: integer
+      required: [plan, price, total_bags]
+
+paths:
+  /v1/health:
+    get:
+      summary: Health check
+      description: Returns service status
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                example:
+                  status: ok
+  /v1/auth/register:
+    post:
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phone: { type: string }
+                email: { type: string, nullable: true }
+                name: { type: string }
+                password: { type: string }
+              required: [phone, name, password]
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/auth/login:
+    post:
+      summary: Log in a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                login: { type: string }
+                password: { type: string }
+              required: [login, password]
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access: { type: string }
+                  refresh: { type: string }
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/auth/refresh:
+    post:
+      summary: Refresh access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh: { type: string }
+              required: [refresh]
+      responses:
+        '200':
+          description: New tokens issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access: { type: string }
+                  refresh: { type: string }
+        '401':
+          description: Invalid refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/me:
+    get:
+      summary: Get current user profile and flags
+      security: [ { BearerAuth: [] } ]
+      responses:
+        '200':
+          description: Profile information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                  hasActiveSubscription:
+                    type: boolean
+                  remainingBags:
+                    type: integer
+                  hasSavedAddresses:
+                    type: boolean
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/addresses:
+    get:
+      summary: List user addresses
+      security: [ { BearerAuth: [] } ]
+      responses:
+        '200':
+          description: List of addresses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Address'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      summary: Create a new address
+      security: [ { BearerAuth: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lat: { type: number, format: double }
+                lng: { type: number, format: double }
+                city: { type: string }
+                street: { type: string }
+                house: { type: string }
+                entrance: { type: string, nullable: true }
+                floor: { type: string, nullable: true }
+                apartment: { type: string, nullable: true }
+                intercom: { type: string, nullable: true }
+                is_default: { type: boolean }
+              required: [lat, lng, city, street, house]
+      responses:
+        '201':
+          description: Address created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Address'
+        '422':
+          description: Address outside of service polygons
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/orders/quote:
+    post:
+      summary: Quote the price for a one‑time order
+      security: [ { BearerAuth: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                address_id: { type: string, format: uuid }
+                bags_count: { type: integer }
+                promocode: { type: string, nullable: true }
+              required: [address_id, bags_count]
+      responses:
+        '200':
+          description: Calculated price and serviceability
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  price_kzt: { type: integer }
+                  can_serve: { type: boolean }
+                  polygon_name: { type: string, nullable: true }
+        '422':
+          description: Address not served by any polygon
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/orders:
+    post:
+      summary: Create a one‑time order
+      security: [ { BearerAuth: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                address_id: { type: string, format: uuid }
+                bags_count: { type: integer }
+                time_option: { type: string, enum: [ASAP, SCHEDULED] }
+                scheduled_at: { type: string, format: date-time, nullable: true }
+                comment: { type: string, nullable: true }
+                promocode: { type: string, nullable: true }
+              required: [address_id, bags_count, time_option]
+      responses:
+        '201':
+          description: Order created along with payment
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  order:
+                    $ref: '#/components/schemas/Order'
+                  payment:
+                    $ref: '#/components/schemas/Payment'
+        '422':
+          description: Address not served
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/payments/webhook:
+    post:
+      summary: Handle payment provider webhook
+      description: Receives webhooks from the payment provider and updates
+        payment and order statuses accordingly.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Webhook processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                example:
+                  status: ok
+
+  # Subscription endpoints
+  /v1/subscriptions/plans:
+    get:
+      summary: List subscription plans
+      description: Returns available subscription plan options with prices and total bags.
+      security: [ { BearerAuth: [] } ]
+      responses:
+        '200':
+          description: List of subscription plans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SubscriptionPlan'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/subscriptions:
+    post:
+      summary: Create a new subscription
+      security: [ { BearerAuth: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                plan: { type: string, enum: [P7, P15, P30] }
+                promocode: { type: string, nullable: true }
+              required: [plan]
+      responses:
+        '201':
+          description: Subscription created and payment initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  subscription:
+                    $ref: '#/components/schemas/Subscription'
+                  payment:
+                    $ref: '#/components/schemas/Payment'
+        '400':
+          description: Invalid input or promo code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/subscriptions/current:
+    get:
+      summary: Get active subscription
+      security: [ { BearerAuth: [] } ]
+      responses:
+        '200':
+          description: Active subscription
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+        '404':
+          description: No active subscription found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/subscriptions/{id}/cancel:
+    post:
+      summary: Cancel a subscription
+      security: [ { BearerAuth: [] } ]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Subscription cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+        '404':
+          description: Subscription not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          description: Unable to cancel subscription
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/subscription-orders:
+    post:
+      summary: Create an order from an active subscription
+      security: [ { BearerAuth: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                bags_count: { type: integer }
+                address_id: { type: string, format: uuid }
+                time_option: { type: string, enum: [ASAP, SCHEDULED] }
+                scheduled_at: { type: string, format: date-time, nullable: true }
+                comment: { type: string, nullable: true }
+              required: [bags_count, address_id, time_option]
+      responses:
+        '201':
+          description: Order created from subscription
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: Invalid input or no remaining bags
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/promocodes/validate:
+    post:
+      summary: Validate a promocode
+      security: [ { BearerAuth: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code: { type: string }
+              required: [code]
+      responses:
+        '200':
+          description: Promocode validation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid: { type: boolean }
+                  discount_type: { type: string, nullable: true }
+                  value: { type: number, nullable: true }
+        '400':
+          description: Invalid request or promocode
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Courier endpoints
+  /v1/courier/auth/login:
+    post:
+      summary: Authenticate a courier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                login: { type: string }
+                password: { type: string }
+              required: [login, password]
+      responses:
+        '200':
+          description: Courier authenticated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access: { type: string }
+                  refresh: { type: string }
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/courier/me:
+    get:
+      summary: Get courier profile
+      security: [ { BearerAuth: [] } ]
+      responses:
+        '200':
+          description: Courier info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  polygon_id: { type: string, format: uuid }
+                  today_stats: { type: object }
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/courier/orders:
+    get:
+      summary: List orders for courier
+      security: [ { BearerAuth: [] } ]
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+          description: Optional status filter
+      responses:
+        '200':
+          description: List of orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/courier/orders/{id}/accept:
+    post:
+      summary: Accept an order by courier
+      security: [ { BearerAuth: [] } ]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Order accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: Order cannot be accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/courier/orders/{id}/status:
+    post:
+      summary: Update an order status by courier
+      security: [ { BearerAuth: [] } ]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                to_status: { type: string }
+                meta: { type: object, nullable: true }
+              required: [to_status]
+      responses:
+        '200':
+          description: Order status updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: Invalid status transition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Admin endpoints
+  /v1/admin/polygons:
+    get:
+      summary: List all polygons
+      security: [ { BearerAuth: [] } ]
+      responses:
+        '200':
+          description: List of polygons
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      summary: Create a new polygon
+      security: [ { BearerAuth: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                city: { type: string }
+                geojson: { type: object }
+              required: [name, city, geojson]
+      responses:
+        '201':
+          description: Polygon created
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/admin/polygons/{id}:
+    put:
+      summary: Update a polygon
+      security: [ { BearerAuth: [] } ]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                city: { type: string }
+                geojson: { type: object }
+      responses:
+        '200':
+          description: Polygon updated
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Polygon not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/admin/couriers:
+    post:
+      summary: Create a new courier or assign an existing user as courier
+      security: [ { BearerAuth: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id: { type: string, format: uuid }
+                name: { type: string, nullable: true }
+                phone: { type: string, nullable: true }
+                polygon_id: { type: string, format: uuid }
+              description: Either provide user_id of an existing user or name and phone for a new user.
+              required: [polygon_id]
+      responses:
+        '201':
+          description: Courier created
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/admin/couriers/{id}:
+    put:
+      summary: Update a courier
+      security: [ { BearerAuth: [] } ]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                is_active: { type: boolean }
+                polygon_id: { type: string, format: uuid }
+                work_hours: { type: object }
+      responses:
+        '200':
+          description: Courier updated
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Courier not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/admin/metrics:
+    get:
+      summary: Retrieve system metrics
+      description: Returns aggregate statistics such as order counts per polygon, SLA metrics and conversion rates.
+      security: [ { BearerAuth: [] } ]
+      responses:
+        '200':
+          description: Metrics
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
