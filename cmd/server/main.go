@@ -28,15 +28,36 @@ func main() {
 	db, err := postgres.Open(cfg.DBDSN)
 	if err != nil { log.Fatal().Err(err).Msg("open db") }
 
-	r := redisrepo.Open(cfg.RedisAddr)
-	if err := redisrepo.Ping(context.Background(), r); err != nil { log.Fatal().Err(err).Msg("redis ping") }
+	// ── Redis: делаем опциональным ───────────────────────────────────────────────
+	if cfg.RedisAddr == "" {
+		log.Warn().Msg("redis disabled: REDIS_ADDR is empty")
+	} else {
+		r := redisrepo.Open(cfg.RedisAddr)
+		if err := redisrepo.Ping(context.Background(), r); err != nil {
+			log.Warn().Err(err).Str("addr", cfg.RedisAddr).Msg("redis not available, continuing without redis")
+		} else {
+			log.Info().Str("addr", cfg.RedisAddr).Msg("redis connected")
+		}
+	}
+	// ─────────────────────────────────────────────────────────────────────────────
 
 	pay := paynetworks.New(cfg.PayAPIKey, cfg.PayReturnURL)
-	router := httpapi.NewRouter(db, cfg.JWTSecret, cfg.JWTRefreshSecret, int64(cfg.JWTAccessTTL.Seconds()), int64(cfg.JWTRefreshTTL.Seconds()), pay)
+	router := httpapi.NewRouter(
+		db,
+		cfg.JWTSecret,
+		cfg.JWTRefreshSecret,
+		int64(cfg.JWTAccessTTL.Seconds()),
+		int64(cfg.JWTRefreshTTL.Seconds()),
+		pay,
+	)
 	srv := &http.Server{ Addr: ":"+cfg.AppPort, Handler: router }
 
 	application := &app.App{ Server: srv }
-	go func(){ if err := application.Start(); err != nil && err != http.ErrServerClosed { log.Fatal().Err(err).Msg("server") } }()
+	go func(){
+		if err := application.Start(); err != nil && err != http.ErrServerClosed {
+			log.Fatal().Err(err).Msg("server")
+		}
+	}()
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
