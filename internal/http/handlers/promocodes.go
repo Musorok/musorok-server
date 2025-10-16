@@ -21,40 +21,42 @@ type PromocodesHandler struct{
 // Validate checks whether a promocode is valid and returns discount information.
 // For now it always returns valid=false.
 func (h *PromocodesHandler) Validate(c *gin.Context) {
-    var req struct { Code string `json:"code"` }
-    // allow code from query param as fallback
-    code := c.Query("code")
-    if err := c.BindJSON(&req); err == nil && req.Code != "" {
-        code = req.Code
+    var req struct {
+        Code string `json:"code" binding:"required"`
     }
-    if code == "" {
+    if err := c.ShouldBindJSON(&req); err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"error": "code required"})
         return
     }
-    // query promocode
-    var promo struct{
-        ID string
-        DiscountType string
-        Value int
+
+    type Promo struct {
+        ID           string    `json:"id"`
+        Code         string    `json:"code"`
+        DiscountType string    `json:"discount_type"`
+        Value        int       `json:"value"`
+        ActiveFrom   time.Time `json:"active_from"`
+        ActiveTo     time.Time `json:"active_to"`
     }
-    now := time.Now()
-    row := h.DB.Raw(
-        `SELECT id, discount_type, value FROM promocodes WHERE code = ? AND is_active = true AND active_from <= ? AND active_to >= ? AND (usage_limit = 0 OR used_count < usage_limit)`,
-        code, now, now,
-    ).Row()
-    if row.Err() != nil {
+
+    var p Promo
+    row := h.DB.
+        Raw(`
+            SELECT id, code, discount_type, value, active_from, active_to
+            FROM promocodes
+            WHERE code = ?
+              AND is_active = true
+              AND now() BETWEEN active_from AND active_to
+              AND (usage_limit IS NULL OR used_count < usage_limit)
+        `, req.Code).Row()
+
+    if err := row.Scan(&p.ID, &p.Code, &p.DiscountType, &p.Value, &p.ActiveFrom, &p.ActiveTo); err != nil {
+        // не найдено / невалидно
         c.JSON(http.StatusOK, gin.H{"valid": false})
         return
     }
-    var id, dtype string
-    var val int
-    if err := row.Scan(&id, &dtype, &val); err != nil {
-        c.JSON(http.StatusOK, gin.H{"valid": false})
-        return
-    }
+
     c.JSON(http.StatusOK, gin.H{
-        "valid": true,
-        "discount_type": dtype,
-        "value": val,
+        "valid":      true,
+        "promocode":  p,
     })
 }
