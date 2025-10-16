@@ -27,29 +27,35 @@ func NewRouter(db *gorm.DB, secret, refresh string, accessTTLSeconds, refreshTTL
     r.StaticFS("/docs", http.Dir("docs"))
 
 	users := services.NewUserService(db)
-	authH := &handlers.AuthHandler{Users: users, JWTSecret: secret, JWTRefreshSecret: refresh, AccessTTL: time.Duration(accessTTLSeconds)*time.Second, RefreshTTL: time.Duration(refreshTTLSeconds)*time.Second}
+    authH := &handlers.AuthHandler{Users: users, JWTSecret: secret, JWTRefreshSecret: refresh, AccessTTL: time.Duration(accessTTLSeconds)*time.Second, RefreshTTL: time.Duration(refreshTTLSeconds)*time.Second, DB: db}
 
 	r.POST("/v1/auth/register", authH.Register)
 	r.POST("/v1/auth/login", authH.Login)
-	r.POST("/v1/auth/refresh", func(c *gin.Context){ c.JSON(http.StatusOK, gin.H{}) }) // TODO
+    r.POST("/v1/auth/refresh", func(c *gin.Context){ c.JSON(http.StatusOK, gin.H{}) }) // TODO
+    // OTP endpoints for WhatsApp verification
+    r.POST("/v1/auth/send_otp", authH.SendOTP)
+    r.POST("/v1/auth/verify_otp", authH.VerifyOTP)
 
 	api := r.Group("/v1", middleware.JWT(secret))
 	api.GET("/me", authH.Me)
+    // delete account
+    api.DELETE("/account", authH.DeleteAccount)
 
 	addrH := &handlers.AddressHandler{DB: db, Addrs: services.NewAddressService(db)}
 	api.GET("/addresses", addrH.List)
 	api.POST("/addresses", addrH.Create)
 
-	ordersH := &handlers.OrdersHandler{DB: db, Pay: pay}
+    ordersH := &handlers.OrdersHandler{DB: db, Pay: pay}
 	api.POST("/orders/quote", ordersH.Quote)
 	api.POST("/orders", ordersH.Create)
+    api.GET("/orders/history", ordersH.History)
 
 	payH := &handlers.PaymentsHandler{}
 	r.POST("/v1/payments/webhook", payH.Webhook)
 
     // subscriptions and promocodes routes
-    subH := &handlers.SubscriptionsHandler{}
-    promoH := &handlers.PromocodesHandler{}
+    subH := &handlers.SubscriptionsHandler{DB: db, Pay: pay}
+    promoH := &handlers.PromocodesHandler{DB: db}
     api.GET("/subscriptions/plans", subH.ListPlans)
     api.POST("/subscriptions", subH.Create)
     api.GET("/subscriptions/current", subH.Current)
@@ -58,7 +64,8 @@ func NewRouter(db *gorm.DB, secret, refresh string, accessTTLSeconds, refreshTTL
     api.POST("/promocodes/validate", promoH.Validate)
 
     // courier routes (login and protected actions)
-    courierH := &handlers.CourierHandler{}
+    // pass DB to courier handler so it can query balances and settlements
+    courierH := &handlers.CourierHandler{DB: db}
     // unauthenticated login
     r.POST("/v1/courier/auth/login", courierH.Login)
     courierGroup := r.Group("/v1/courier", middleware.JWT(secret))
@@ -66,9 +73,12 @@ func NewRouter(db *gorm.DB, secret, refresh string, accessTTLSeconds, refreshTTL
     courierGroup.GET("/orders", courierH.ListOrders)
     courierGroup.POST("/orders/:id/accept", courierH.AcceptOrder)
     courierGroup.POST("/orders/:id/status", courierH.UpdateOrderStatus)
+    // courier balance and withdrawal
+    courierGroup.GET("/balance", courierH.Balance)
+    courierGroup.POST("/withdraw", courierH.Withdraw)
 
     // admin routes, protected by admin role (checked in handlers or middleware)
-    adminH := &handlers.AdminHandler{}
+    adminH := &handlers.AdminHandler{DB: db}
     adminGroup := r.Group("/v1/admin", middleware.JWT(secret))
     adminGroup.GET("/polygons", adminH.ListPolygons)
     adminGroup.POST("/polygons", adminH.CreatePolygon)
@@ -76,6 +86,7 @@ func NewRouter(db *gorm.DB, secret, refresh string, accessTTLSeconds, refreshTTL
     adminGroup.POST("/couriers", adminH.CreateCourier)
     adminGroup.PUT("/couriers/:id", adminH.UpdateCourier)
     adminGroup.GET("/metrics", adminH.Metrics)
+    adminGroup.POST("/promocodes", adminH.CreatePromocode)
 
 	return r
 }

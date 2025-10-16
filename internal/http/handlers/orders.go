@@ -1,13 +1,16 @@
 package handlers
 
 import (
-	"net/http"
-	"time"
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
-	"github.com/musorok/server/internal/domain"
-	"github.com/musorok/server/internal/core/payments/paynetworks"
-	"gorm.io/gorm"
+    "net/http"
+    "time"
+    "strconv"
+    
+    "github.com/gin-gonic/gin"
+    "github.com/google/uuid"
+    "gorm.io/gorm"
+    
+    "github.com/musorok/server/internal/domain"
+    "github.com/musorok/server/internal/core/payments/paynetworks"
 )
 
 type OrdersHandler struct{
@@ -54,4 +57,34 @@ func (h *OrdersHandler) Create(c *gin.Context) {
 
 	intent, _ := h.Pay.CreatePaymentIntent(c, price, map[string]string{"order_id": order.ID.String()})
 	c.JSON(http.StatusCreated, gin.H{"order": order, "payment": gin.H{"id": intent.ID, "paymentUrl": intent.PaymentURL}})
+}
+
+// History returns a paginated list of the authenticated user's past orders.
+// Query parameters: page (default 1), limit (default 20), sort (created_at desc|asc).
+func (h *OrdersHandler) History(c *gin.Context) {
+    uid := c.GetString("uid")
+    var uID uuid.UUID
+    var err error
+    if uID, err = uuid.Parse(uid); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+        return
+    }
+    page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+    if page < 1 { page = 1 }
+    limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+    if limit <= 0 { limit = 20 }
+    sort := c.DefaultQuery("sort", "desc")
+    orderStr := "created_at desc"
+    if sort == "asc" { orderStr = "created_at asc" }
+    offset := (page - 1) * limit
+    var orders []domain.Order
+    var total int64
+    h.DB.Model(&domain.Order{}).Where("user_id = ?", uID).Count(&total)
+    h.DB.Where("user_id = ?", uID).Order(orderStr).Offset(offset).Limit(limit).Find(&orders)
+    c.JSON(http.StatusOK, gin.H{
+        "orders": orders,
+        "total_count": total,
+        "page": page,
+        "limit": limit,
+    })
 }

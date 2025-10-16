@@ -146,3 +146,55 @@ type Payment struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
+
+// Settlement and payout structures
+
+// OrderSettlement records the amount due to a courier when an order is completed.
+// Each order can have at most one settlement entry. The BagsCount and AmountKZT
+// fields reflect the number of bags collected and the compensation owed for the
+// order. Settlements are created when an order transitions to the DONE status.
+type OrderSettlement struct {
+    ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+    OrderID   uuid.UUID `gorm:"type:uuid;index"`
+    CourierID uuid.UUID `gorm:"type:uuid;index"`
+    BagsCount int
+    AmountKZT int
+    CreatedAt time.Time
+}
+
+// CourierBalance tracks the aggregate earnings and withdrawals for a courier. The
+// TotalEarnedKZT field accumulates all settlements for completed orders, while
+// TotalWithdrawnKZT reflects payouts that have been processed. Available
+// balance can be calculated as TotalEarnedKZT - TotalWithdrawnKZT.
+type CourierBalance struct {
+    CourierID        uuid.UUID `gorm:"type:uuid;primaryKey"`
+    TotalEarnedKZT   int64
+    TotalWithdrawnKZT int64
+    UpdatedAt        time.Time
+}
+
+// PayoutStatus enumerates the lifecycle of a payout request. REQUESTED
+// indicates the courier initiated a withdrawal, APPROVED means an admin has
+// approved the request, PAID indicates funds have been sent, and REJECTED
+// covers declined withdrawals.
+type PayoutStatus string
+
+const (
+    PayoutRequested PayoutStatus = "REQUESTED"
+    PayoutApproved  PayoutStatus = "APPROVED"
+    PayoutPaid      PayoutStatus = "PAID"
+    PayoutRejected  PayoutStatus = "REJECTED"
+)
+
+// PayoutRequest represents a courier's request to withdraw a portion of their
+// available earnings. The AmountKZT field stores the requested sum. The status
+// reflects the current stage of processing. ProcessedAt records when the
+// request was finalized.
+type PayoutRequest struct {
+    ID          uuid.UUID    `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+    CourierID   uuid.UUID    `gorm:"type:uuid;index"`
+    AmountKZT   int
+    Status      PayoutStatus `gorm:"type:payout_status_enum;default:'REQUESTED'"`
+    RequestedAt time.Time
+    ProcessedAt *time.Time
+}

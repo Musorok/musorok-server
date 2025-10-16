@@ -1,15 +1,16 @@
 package main
 
 import (
-	"fmt"
-	"os"
-	"encoding/json"
-	"time"
+    "fmt"
+    "os"
+    "encoding/json"
+    "time"
 
-	"github.com/joho/godotenv"
-	"gorm.io/gorm"
-	"gorm.io/driver/postgres"
-	"github.com/musorok/server/internal/domain"
+    "github.com/joho/godotenv"
+    "gorm.io/gorm"
+    "gorm.io/driver/postgres"
+    "golang.org/x/crypto/bcrypt"
+    "github.com/musorok/server/internal/domain"
 )
 
 func main() {
@@ -23,6 +24,14 @@ func main() {
 
 	test := domain.User{ Name:"Test User", Phone:"+77070000001", Role:domain.RoleUser }
 	db.Where("phone = ?", test.Phone).FirstOrCreate(&test)
+
+    // Insert a test account with phone +77064286612 and password 0000 if not exists
+    var hashed string
+    if pw, err := bcrypt.GenerateFromPassword([]byte("0000"), bcrypt.DefaultCost); err == nil {
+        hashed = string(pw)
+    }
+    test2 := domain.User{ Name:"Test User2", Phone:"+77064286612", Role:domain.RoleUser, PasswordHash: &hashed }
+    db.Where("phone = ?", test2.Phone).FirstOrCreate(&test2)
 
 	// Polygon 4YOU (примерной формы, внутри верх Алматы)
 	poly := domain.Polygon{ Name:"ЖК 4YOU", City:"Алматы", IsActive:true }

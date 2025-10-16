@@ -717,6 +717,199 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  # OTP endpoints
+  /v1/auth/send_otp:
+    post:
+      summary: Send OTP via WhatsApp
+      description: Sends a one-time password to the specified phone number via WhatsApp. The OTP is used for phone-based login or registration.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phone: { type: string }
+              required: [phone]
+      responses:
+        '200':
+          description: OTP sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sent: { type: boolean }
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/auth/verify_otp:
+    post:
+      summary: Verify OTP and authenticate
+      description: Verifies the one-time password for the given phone number and returns JWT tokens on success.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phone: { type: string }
+                code: { type: string }
+              required: [phone, code]
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access: { type: string }
+                  refresh: { type: string }
+        '401':
+          description: Invalid code or OTP not sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Account deletion
+  /v1/account:
+    delete:
+      summary: Delete user account
+      description: Permanently deletes the authenticated user's account and all associated data (addresses, sessions, tokens).
+      security: [ { BearerAuth: [] } ]
+      responses:
+        '200':
+          description: Account deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: boolean }
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Orders history
+  /v1/orders/history:
+    get:
+      summary: List past orders
+      description: Returns a paginated list of the authenticated user's past orders. Accepts page, limit and sort query parameters.
+      security: [ { BearerAuth: [] } ]
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+          description: Page number (default 1)
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: Number of items per page (default 20)
+        - in: query
+          name: sort
+          schema:
+            type: string
+            enum: [asc, desc]
+          description: Sort by created_at ascending or descending (default desc)
+      responses:
+        '200':
+          description: Paginated list of orders
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orders:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Order'
+                  total_count: { type: integer }
+                  page: { type: integer }
+                  limit: { type: integer }
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Courier balance and withdrawal
+  /v1/courier/balance:
+    get:
+      summary: Get courier balance
+      description: Returns the courier's total earned, total withdrawn and available balance.
+      security: [ { BearerAuth: [] } ]
+      responses:
+        '200':
+          description: Balance information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalEarned: { type: integer }
+                  totalWithdrawn: { type: integer }
+                  available: { type: integer }
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/courier/withdraw:
+    post:
+      summary: Request payout for courier
+      description: Courier requests a withdrawal of available earnings. Creates a payout request with status REQUESTED.
+      security: [ { BearerAuth: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount: { type: integer }
+              required: [amount]
+      responses:
+        '200':
+          description: Payout request created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  status: { type: string }
+        '400':
+          description: Invalid request or insufficient balance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   # Courier endpoints
   /v1/courier/auth/login:
     post:
